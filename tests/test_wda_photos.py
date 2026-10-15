@@ -89,5 +89,13 @@ class PhotoImportManagerTests(unittest.TestCase):
         self.assertEqual(result['error']['code'], 'remote_record_missing')
 
 
+class ResultContentTests(unittest.TestCase):
+    def test_successful_photo_result_with_null_error_is_not_an_mcp_error(self):
+        sys.path.insert(0, str(ROOT / 'server'))
+        from iphone_use import result_content
+        result = result_content({'request_id': 'request-0001', 'status': 'succeeded', 'error': None})
+        self.assertFalse(result['isError'])
+
+
 if __name__ == '__main__':
     unittest.main()

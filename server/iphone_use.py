@@ -663,7 +663,7 @@ def result_content(data,structured=False):
     if not image and data.get("results"):
         last=data["results"][-1];image=last.get("image") or last.get("observation",{}).get("image")
     if image and Path(image["path"]).is_file():content.append({"type":"image","data":base64.b64encode(Path(image["path"]).read_bytes()).decode(),"mimeType":image.get("mimeType","image/png")})
-    result={"content":content,"isError":"error" in data}
+    result={"content":content,"isError":bool(data.get("error"))}
     if structured:result["structuredContent"]=data
     return result
 
