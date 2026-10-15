@@ -21,6 +21,7 @@ from wda_client import WDAClient, WDAError
 from wda_controller import CALL_BUDGET, DEFAULT_MAX_NODES, PhoneController, TYPING_FREQUENCY
 from wda_setup import SetupManager, state_directory
 from wda_apps import AppCatalog
+from wda_photos import PhotoImportManager
 from wda_screen import ScreenHub
 import wda_image
 from analytics import Analytics
@@ -86,6 +87,8 @@ SCHEMAS={
  "scroll_find":obj({"selector":SEL,"direction":string("Finger movement; up usually reveals later rows.",enum=["up","down","left","right"]),"max_swipes":{**num(0,10,"integer"),"default":1,"description":"0 only queries; positive legacy limits allow at most one swipe, then an unresolved target returns a screenshot for the next decision."}},("selector",)),
  "collect_list":obj({"row_type":string(),"max_pages":num(1,10,"integer"),"end_selector":SEL}),
  "apps":obj({"query":string(max_length=100),"country":string(max_length=2),"source":string(enum=["auto","catalog","installed","apple"]),"limit":num(1,30,"integer")},("query",)),
+ "upload_photo":obj({"path":string(max_length=4096),"request_id":string(max_length=128)},("path","request_id")),
+ "photo_import_status":obj({"request_id":string(max_length=128)},("request_id",)),
  "doctor":obj({}),"ready":obj({"screenshot":{"type":"boolean","default":True,"description":"Also verify screenshot; false retains status/session/source/viewport/unlock checks."},"recover":{"type":"boolean","default":True,"description":"Normal task startup: omit or set true, so a persistent local.pid/XCTest fault can queue one bounded restart of a proven owned PUA. Use false only for an explicitly requested diagnostic/no-restart check, not a routine precheck. False is respected and returns ready=false, state=recovery_required when restart is needed; queued recovery returns state=recovering. Neither state proves readiness."}}),"metrics":obj({"reset":{"type":"boolean","default":False,"description":"Return the totals, then start a new measurement window."}}),
  "setup":obj({"action":string(enum=["discover","fetch","configure","build","start","stop","status"]),"udid":string(),"team_id":string(),"bundle_id":string(),"source_dir":string(max_length=4096),"local_port":num(1024,65535,"integer"),"device_port":num(1024,65535,"integer"),"job_id":string(),"wait_seconds":{**num(0,30),"description":"Bounded wait for this job: start defaults to 20 seconds, status to 0. Use status with job_id and 20 to await an active start/recovery. Timeout keeps the job running; do not start again."}},("action",))
 }
@@ -120,7 +123,9 @@ DESCRIPTIONS={
  "metrics":"In-process totals without text, app data or images: PUA HTTP time and bytes, tool time, response bytes per tool, and the wait between each response and the next tool request (host, model and user time). reset=true starts a new window."
 }
 DESCRIPTIONS["apps"]="Resolve a real bundle ID by installed-device inventory, bundled verified aliases, or Apple's Search API. Query app name before launch instead of guessing. Store metadata does not prove installation; check installed_verified and publisher/country."
-READS={"doctor","observe","find","wait","metrics","apps"}
+DESCRIPTIONS["upload_photo"]="Upload one actual JPEG/PNG (max 20 MiB) over USB and save original bytes. request_id is durable; see usage skill."
+DESCRIPTIONS["photo_import_status"]="Query one import without uploading. succeeded has asset_id; uncertain must not be retried."
+READS={"doctor","observe","find","wait","metrics","apps","photo_import_status"}
 READS.update(("screen","screen_frame"))
 DESCRIPTIONS["screen"]="Open or reuse the live iPhone screen in the Codex side panel. No phone actions or UI controls. Pause the preview before password/Face ID user takeover; resume after explicit completion. READY also opens or reuses this view by default."
 DESCRIPTIONS["screen_frame"]="App-only cached live preview and action cursor events. Never reads XML, starts sessions or occupies the phone operation lock."
@@ -284,6 +289,7 @@ class Runtime:
         self.phone.snapshot_restore=self.save_session
         self.setup_manager=SetupManager(self.state_dir,self.base_url)
         self.apps=AppCatalog(self.state_dir,self.setup_manager)
+        self.photos=PhotoImportManager(self.state_dir,self.client)
         self.screen=ScreenHub(self.state_dir)
         self.phone.screen=self.screen
         self.phone.settle_seconds=setting("WDA_SETTLE_SECONDS",SETTLE_SECONDS,0,2)
@@ -564,6 +570,8 @@ class Runtime:
                 except Exception:pass
             if op=="doctor":return self.setup_manager.doctor()
             if op=="apps":return self.apps.lookup(**args)
+            if op=="upload_photo":return self.photos.upload(**args)
+            if op=="photo_import_status":return self.photos.status(**args)
             if op=="setup":
                 manager=self.setup_manager
                 candidate_url=self.base_url
@@ -576,7 +584,7 @@ class Runtime:
                 if result.get("ok") and args["action"]=="configure" and "local_port" in args:
                     self.base_url=candidate_url;self.setup_manager=manager
                     self.apps.setup_manager=manager
-                    self.client=WDAClient(self.base_url);self.phone.client=self.client
+                    self.client=WDAClient(self.base_url);self.phone.client=self.client;self.photos.client=self.client
                 return result
             if op=="ready":
                 try:self.screen.start()
