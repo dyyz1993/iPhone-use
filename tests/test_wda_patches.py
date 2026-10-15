@@ -15,6 +15,8 @@ class WdaPatchTests(unittest.TestCase):
         self.assertLess(len(data), 64 * 1024)
         self.assertEqual(wda_patches.PATCH_FINGERPRINT, wda_patches.patch_fingerprint())
         self.assertRegex(wda_patches.PATCH_FINGERPRINT, r'^[0-9a-f]{64}$')
+        self.assertIn(b'options.originalFilename = [NSString stringWithFormat:@"PUA-%@.%@"', data)
+        self.assertIn(b'record.requestId', data)
 
     def test_apply_rejects_unchecked_patch_and_checks_both_directions(self):
         with tempfile.TemporaryDirectory() as name:

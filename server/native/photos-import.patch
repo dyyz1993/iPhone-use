@@ -113,7 +113,7 @@ new file mode 100644
 index 0000000..0000001
 --- /dev/null
 +++ b/WebDriverAgentLib/Commands/FBPhotoCommands.m
-@@ -0,0 +0,198 @@
+@@ -0,0 +0,200 @@
 +/**
 + * Copyright (c) 2026-present, iPhone Use
 + * Licensed under the Apache 2.0 license found in the project root.
@@ -279,7 +279,9 @@ index 0000000..0000001
 +  __block NSString *assetId = nil;
 +  BOOL changed = [[PHPhotoLibrary sharedPhotoLibrary] performChangesAndWait:^{
 +    PHAssetCreationRequest *request = [PHAssetCreationRequest creationRequestForAsset];
-+    [request addResourceWithType:PHAssetResourceTypePhoto fileURL:[NSURL fileURLWithPath:record.path] options:nil];
++    PHAssetResourceCreationOptions *options = [PHAssetResourceCreationOptions new];
++    options.originalFilename = [NSString stringWithFormat:@"PUA-%@.%@", record.requestId, record.path.pathExtension.lowercaseString];
++    [request addResourceWithType:PHAssetResourceTypePhoto fileURL:[NSURL fileURLWithPath:record.path] options:options];
 +    assetId = request.placeholderForCreatedAsset.localIdentifier;
 +  } error:&error];
 +  if (!changed) {
