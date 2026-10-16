@@ -197,7 +197,7 @@ These changes reduce duplicate requests and model round trips. Overall task spee
 
 ## Tools
 
-There are 19 model tools and 2 additional widget-only tools.
+There are 21 model tools and 2 additional widget-only tools.
 
 | Tools | Purpose |
 | --- | --- |
